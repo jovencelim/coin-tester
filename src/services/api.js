@@ -1,9 +1,11 @@
-import axios from "axios";
-
-export async function sendAudio(blob) {
+export async function sendAudio(file) {
   const formData = new FormData();
-  formData.append("file", blob, "coin.wav");
+  formData.append("file", file);
 
-  const res = await axios.post("http://localhost:8000/analyze", formData);
-  return res.data;
+  const res = await fetch("http://localhost:8000/analyze", {
+    method: "POST",
+    body: formData,
+  });
+
+  return await res.json();
 }

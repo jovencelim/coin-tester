@@ -1,5 +1,5 @@
 import { useState } from "react";
-import Recorder from "./components/Recorder";
+import Uploader from "./components/Uploader";
 import Waveform from "./components/Waveform";
 import FFTChart from "./components/FFTChart";
 import DecayChart from "./components/DecayChart";
@@ -54,10 +54,10 @@ export default function App() {
         style={{ gridTemplateColumns: "320px 1fr 1fr", gridTemplateRows: "auto auto" }}
       >
 
-        {/* 01 — Recorder (spans 2 rows) */}
+        {/* 01 — Uploader (spans 2 rows) */}
         <div style={{ gridColumn: 1, gridRow: "1 / 3" }}>
           <Panel title="Input" index="01">
-            <Recorder onRecorded={setAudioUrl} onResult={setResult} />
+              <Uploader onRecorded={setAudioUrl} onResult={setResult}/>
           </Panel>
         </div>
 
