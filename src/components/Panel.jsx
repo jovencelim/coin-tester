@@ -4,7 +4,6 @@ export default function Panel({ title, index, children }) {
       className="h-full rounded-xl overflow-hidden border border-white/[0.07]"
       style={{ background: "#111113" }}
     >
-      {/* Panel header */}
       <div
         className="flex items-center justify-between px-4 py-3 border-b border-white/[0.07]"
         style={{ background: "#18181C" }}
@@ -19,7 +18,6 @@ export default function Panel({ title, index, children }) {
         )}
       </div>
 
-      {/* Panel body */}
       <div className="p-4">
         {children}
       </div>

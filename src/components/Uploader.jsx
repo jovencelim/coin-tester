@@ -8,7 +8,6 @@ export default function Uploader({ onRecorded, onResult }) {
     const file = e.target.files[0];
     if (!file) return;
 
-    // ✅ Validate WAV
     if (!file.name.endsWith(".wav")) {
       alert("Please upload a WAV file");
       return;
@@ -16,7 +15,6 @@ export default function Uploader({ onRecorded, onResult }) {
 
     setFileName(file.name);
 
-    // Preview
     const url = URL.createObjectURL(file);
     onRecorded(url);
 
@@ -33,12 +31,7 @@ export default function Uploader({ onRecorded, onResult }) {
     <div className="flex flex-col items-center gap-4">
       <label className="bg-blue-500 hover:bg-blue-600 px-6 py-3 rounded-xl cursor-pointer font-semibold">
         Upload WAV
-        <input
-          type="file"
-          accept=".wav"
-          onChange={handleFile}
-          className="hidden"
-        />
+        <input type="file" accept=".wav" onChange={handleFile} className="hidden"/>
       </label>
 
       <p className="text-sm text-slate-400">
