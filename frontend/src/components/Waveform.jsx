@@ -45,7 +45,7 @@ export default function Waveform({ audioUrl }) {
       draw();
     });
 
-    audio.play();
+    audio.play();z
   }, [audioUrl]);
 
   return <canvas ref={canvasRef} width={400} height={100} />;
