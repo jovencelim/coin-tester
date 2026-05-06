@@ -1,52 +1,71 @@
 import { useEffect, useRef } from "react";
 
-export default function Waveform({ audioUrl }) {
-  const canvasRef = useRef();
+export default function Waveform({ waveform, onset }) {
+  const canvasRef = useRef(null);
 
   useEffect(() => {
-    if (!audioUrl) return;
+    if (!waveform || waveform.length === 0) return;
 
-    const audio = new Audio(audioUrl);
-    const ctx = new AudioContext();
+    const canvas = canvasRef.current;
 
-    audio.addEventListener("play", () => {
-      const source = ctx.createMediaElementSource(audio);
-      const analyser = ctx.createAnalyser();
+    const ctx = canvas.getContext("2d");
 
-      source.connect(analyser);
-      analyser.connect(ctx.destination);
+    const width = canvas.width;
+    const height = canvas.height;
 
-      const canvas = canvasRef.current;
-      const c = canvas.getContext("2d");
+    // background
+    ctx.fillStyle = "#0F172A";
+    ctx.fillRect(0, 0, width, height);
 
-      analyser.fftSize = 2048;
-      const data = new Uint8Array(analyser.frequencyBinCount);
+    // waveform
+    ctx.strokeStyle = "#38BDF8";
+    ctx.lineWidth = 1.5;
 
-      function draw() {
-        requestAnimationFrame(draw);
+    ctx.beginPath();
 
-        analyser.getByteTimeDomainData(data);
+    const midY = height / 2;
 
-        c.fillStyle = "#1e293b";
-        c.fillRect(0, 0, canvas.width, canvas.height);
+    for (let i = 0; i < waveform.length; i++) {
+      const x = (i / waveform.length) * width;
 
-        c.strokeStyle = "#38bdf8";
-        c.beginPath();
+      const y = midY + waveform[i] * midY * 0.9;
 
-        for (let i = 0; i < data.length; i++) {
-          const x = (i / data.length) * canvas.width;
-          const y = (data[i] / 255) * canvas.height;
-          c.lineTo(x, y);
-        }
-
-        c.stroke();
+      if (i === 0) {
+        ctx.moveTo(x, y);
+      } else {
+        ctx.lineTo(x, y);
       }
+    }
 
-      draw();
-    });
+    ctx.stroke();
 
-    audio.play();z
-  }, [audioUrl]);
+    // onset marker
+    if (onset !== undefined) {
+      const onsetX = (onset / waveform.length) * width;
 
-  return <canvas ref={canvasRef} width={400} height={100} />;
+      ctx.strokeStyle = "#D4AF37";
+      ctx.lineWidth = 2;
+
+      ctx.beginPath();
+      ctx.moveTo(onsetX, 0);
+      ctx.lineTo(onsetX, height);
+      ctx.stroke();
+
+      // label
+      ctx.fillStyle = "#D4AF37";
+      ctx.font = "11px monospace";
+      ctx.fillText("ONSET", onsetX + 6, 14);
+    }
+  }, [waveform, onset]);
+
+  return (
+    <div className="w-full overflow-hidden rounded-xl border border-white/5">
+      <canvas
+        ref={canvasRef}
+        width={1200}
+        height={220}
+        className="w-full h-[220px]"
+      />
+    </div>
+  );
 }
