@@ -193,6 +193,30 @@ export default function Uploader({ onResult }) {
           </div>
         </div>
       )}
+      {/* reload */}
+      {fileMeta && (
+        <button
+          onClick={() => inputRef.current?.click()}
+          className="
+          w-full
+          py-2.5
+          rounded-lg
+          font-mono
+          text-xs
+          tracking-widest
+          text-[#7A7870]
+          border
+          border-white/[0.07]
+          bg-transparent
+          hover:border-[rgba(212,175,55,0.3)]
+          hover:text-[#E8E6E0]
+          transition-all
+          duration-150
+        "
+        >
+          ↺ LOAD ANOTHER FILE
+        </button>
+      )}
     </div>
   );
 }
