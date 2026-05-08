@@ -11,7 +11,7 @@ import { useState, useRef, useCallback } from "react";
  * up to the parent via props.
  */
 
-const SURFACES      = ["Glass", "Tile", "Marble", "Wood", "Concrete"];
+const SURFACES      = ["Tile", "Concrete", "Wood"];
 const DENOMINATIONS = [
   { value: "1",  label: "₱1  — Nickel-plated steel, 23mm" },
   { value: "5",  label: "₱5  — Nickel-plated steel, 27mm" },
