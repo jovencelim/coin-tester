@@ -1,22 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <!-- Dark background circle -->
   <circle cx="16" cy="16" r="15" fill="#0A0A0B"/>
-
-  <!-- Outer gold ring -->
   <circle cx="16" cy="16" r="15" fill="none" stroke="#D4AF37" stroke-width="1.5"/>
-
-  <!-- Inner ring detail -->
-  <circle cx="16" cy="16" r="11.5" fill="none" stroke="#D4AF37" stroke-width="0.6" opacity="0.5"/>
-
-  <!-- Frequency waveform bars (FFT-style) centered -->
-  <rect x="5"  y="14" width="1.5" height="4"  rx="0.75" fill="#D4AF37" opacity="0.5"/>
-  <rect x="7.5" y="12" width="1.5" height="8"  rx="0.75" fill="#D4AF37" opacity="0.65"/>
-  <rect x="10" y="10" width="1.5" height="12" rx="0.75" fill="#D4AF37" opacity="0.8"/>
-  <rect x="12.5" y="8" width="2"   height="16" rx="1"    fill="#F0CE5E"/>
-  <rect x="15.5" y="10" width="1.5" height="12" rx="0.75" fill="#D4AF37" opacity="0.8"/>
-  <rect x="18" y="12" width="1.5" height="8"  rx="0.75" fill="#D4AF37" opacity="0.65"/>
-  <rect x="20.5" y="14" width="1.5" height="4"  rx="0.75" fill="#D4AF37" opacity="0.5"/>
-
-  <!-- Subtle glow on peak bar -->
-  <rect x="12.5" y="8" width="2" height="16" rx="1" fill="#F0CE5E" opacity="0.15"/>
+  <circle cx="16" cy="16" r="10" fill="none" stroke="#D4AF37" stroke-width="0.8" opacity="0.4"/>
+  <text x="16" y="21" text-anchor="middle" font-family="serif" font-size="14" font-weight="bold" fill="#D4AF37">₱</text>
 </svg>

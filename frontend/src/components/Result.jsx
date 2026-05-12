@@ -49,7 +49,7 @@ export default function Result({ data }) {
 
   const vc = VERDICT_CONFIG[verdict] ?? VERDICT_CONFIG.Suspect;
 
-  const surfaceNormalized = meta?.surface && meta.surface !== "Tile" && meta.surface !== "Glass";
+  const surfaceNormalized = meta?.surface && meta.surface !== "Tile";
 
   const metrics = [
     {
