@@ -1,21 +1,3 @@
-/**
- * Result
- * ------
- * Displays the analysis result returned directly from the Flask backend.
- * Classification (verdict, confidence, coin_label) is computed server-side
- * in coin_signal.py — this component only renders what it receives.
- *
- * Expected shape of `data` prop (from /analyze response):
- *   f0          : number   — dominant frequency in Hz
- *   alpha       : number   — decay constant s⁻¹
- *   Q           : number   — Q-factor
- *   verdict     : string   — "Genuine" | "Suspect" | "Counterfeit"
- *   confidence  : number   — 0–100
- *   coin_label  : string   — e.g. "₱5 NGC"
- *   r_squared   : number   — decay fit quality 0–1
- *   meta        : object   — { surface, denomination, drop_height }
- */
-
 const VERDICT_CONFIG = {
   Genuine:     { color: "#4ADE80", bg: "rgba(74,222,128,0.07)",  border: "rgba(74,222,128,0.25)",  icon: "✅" },
   Suspect:     { color: "#FCD34D", bg: "rgba(252,211,77,0.07)",  border: "rgba(252,211,77,0.25)",  icon: "⚠️" },
@@ -23,8 +5,6 @@ const VERDICT_CONFIG = {
 };
 
 export default function Result({ data }) {
-
-  // ── Empty state ──
   if (!data?.verdict) {
     return (
       <div
@@ -42,7 +22,7 @@ export default function Result({ data }) {
     f0, alpha, Q,
     f0_norm, alpha_norm,
     verdict, confidence, coin_label,
-    r_squared, snr_db, snr_warning,
+    r_squared, snr_db, snr_warning, alpha_warning,
     harmonics = [],
     meta,
   } = data;
@@ -68,7 +48,7 @@ export default function Result({ data }) {
     },
     {
       label: "Q-FACTOR",
-      value: parseInt(Q).toLocaleString(),
+      value: (!Q || Q > 9999) ? "—" : parseInt(Q).toLocaleString(),
       sub:   null,
       unit:  "display only",
       gold:  true,
@@ -84,8 +64,6 @@ export default function Result({ data }) {
 
   return (
     <div className="flex flex-col gap-3">
-
-      {/* ── Metric cards ── */}
       <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(4, 1fr)" }}>
         {metrics.map(({ label, value, sub, unit, gold }) => (
           <div
@@ -109,8 +87,6 @@ export default function Result({ data }) {
           </div>
         ))}
       </div>
-
-      {/* ── Harmonics row ── */}
       {harmonics.length > 0 && (
         <div
           className="grid gap-2 rounded-xl px-4 py-3"
@@ -138,8 +114,6 @@ export default function Result({ data }) {
           })}
         </div>
       )}
-
-      {/* ── Verdict ── */}
       <div
         className="flex items-center gap-4 rounded-xl px-5 py-4 border"
         style={{ background: vc.bg, borderColor: vc.border }}
@@ -164,10 +138,16 @@ export default function Result({ data }) {
             </span>
           )}
         </div>
-
-        {/* Warnings */}
         <div className="flex flex-col items-end gap-2 shrink-0">
-          {r_squared < 0.85 && (
+          {alpha_warning && (
+            <div className="flex flex-col items-end gap-0.5">
+              <span className="font-mono text-[10px] text-[#F87171]">⚠ No ring detected</span>
+              <span className="font-mono text-[10px] text-[#7A7870] text-right">
+                Drop coin flat — do not catch it
+              </span>
+            </div>
+          )}
+          {r_squared < 0.85 && !alpha_warning && (
             <div className="flex flex-col items-end gap-0.5">
               <span className="font-mono text-[10px] text-[#FCD34D]">⚠ Low R²</span>
               <span className="font-mono text-[10px] text-[#7A7870] text-right">
@@ -185,7 +165,6 @@ export default function Result({ data }) {
           )}
         </div>
       </div>
-
     </div>
   );
 }

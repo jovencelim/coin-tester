@@ -17,7 +17,6 @@ export default function Panel({ title, index, children }) {
           </span>
         )}
       </div>
-
       <div className="p-4">
         {children}
       </div>

@@ -4,21 +4,7 @@ import {
   ReferenceLine, ResponsiveContainer, CartesianGrid,
 } from "recharts";
 
-/**
- * FFTChart
- * --------
- * Receives the `fft` object from the Flask /analyze response.
- * No signal processing here — purely a display component.
- *
- * Expected fft shape:
- *   freqs        : number[]  — frequency axis in Hz
- *   magnitudes_db: number[]  — magnitude in dB
- *   f0           : number    — dominant frequency in Hz
- *   f0_bin       : number    — bin index of f0
- */
 export default function FFTChart({ fft }) {
-
-  // ── Empty state ──
   if (!fft) {
     return (
       <div
@@ -32,7 +18,6 @@ export default function FFTChart({ fft }) {
 
   const { freqs, magnitudes_db, f0, harmonics = [] } = fft;
 
-  // Downsample to max 300 points and cap at 8 kHz for performance
   const chartData = useMemo(() => {
     const maxFreq = 8000;
     const data    = [];
@@ -63,8 +48,6 @@ export default function FFTChart({ fft }) {
 
   return (
     <div className="flex flex-col gap-3">
-
-      {/* f₀ and harmonics readout */}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <span className="font-mono text-[11px] text-[#7A7870] tracking-widest">
           DOMINANT FREQ
@@ -83,8 +66,6 @@ export default function FFTChart({ fft }) {
           ))}
         </div>
       </div>
-
-      {/* Spectrum chart */}
       <div className="rounded-lg overflow-hidden" style={{ background: "#18181C" }}>
         <ResponsiveContainer width="100%" height={130}>
           <AreaChart data={chartData} margin={{ top: 8, right: 8, bottom: 0, left: -10 }}>
@@ -94,9 +75,7 @@ export default function FFTChart({ fft }) {
                 <stop offset="95%" stopColor="#D4AF37" stopOpacity={0.02} />
               </linearGradient>
             </defs>
-
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
-
             <XAxis
               dataKey="freq"
               tick={{ fontSize: 9, fill: "#7A7870", fontFamily: "monospace" }}
@@ -107,10 +86,7 @@ export default function FFTChart({ fft }) {
               domain={[-80, 0]}
               tick={{ fontSize: 9, fill: "#7A7870", fontFamily: "monospace" }}
             />
-
             <Tooltip content={<CustomTooltip />} />
-
-            {/* f₀ marker */}
             <ReferenceLine
               x={parseFloat(f0.toFixed(1))}
               stroke="#F0CE5E"
@@ -121,8 +97,6 @@ export default function FFTChart({ fft }) {
                 fill: "#F0CE5E", fontSize: 10, fontFamily: "monospace",
               }}
             />
-
-            {/* Harmonic markers */}
             {harmonics.map((h) => (
               <ReferenceLine
                 key={h.n}
@@ -136,7 +110,6 @@ export default function FFTChart({ fft }) {
                 }}
               />
             ))}
-
             <Area
               type="monotone"
               dataKey="mag"
@@ -150,14 +123,11 @@ export default function FFTChart({ fft }) {
           </AreaChart>
         </ResponsiveContainer>
       </div>
-
-      {/* Axis labels */}
       <div className="flex justify-between font-mono text-[10px] text-[#7A7870] px-1">
         <span>0 Hz</span>
         <span>Frequency</span>
         <span>8 kHz</span>
       </div>
-
     </div>
   );
 }

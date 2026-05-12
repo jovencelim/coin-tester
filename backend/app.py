@@ -1,14 +1,3 @@
-"""
-app.py
-------
-Flask backend for the ₱1 NGC coin authenticity tester.
-
-Endpoints:
-  GET  /          — health check
-  POST /analyze   — accepts a .wav file + optional metadata,
-                    returns JSON analysis result
-"""
-
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 
@@ -33,7 +22,6 @@ def home():
 @app.route("/analyze", methods=["POST"])
 def analyze():
 
-    # ── Validate file presence ──
     if "file" not in request.files:
         return jsonify({"error": "No file uploaded"}), 400
 
@@ -42,14 +30,12 @@ def analyze():
     if not file.filename.lower().endswith(".wav"):
         return jsonify({"error": "Only .wav files are supported"}), 400
 
-    # ── Parse experiment metadata from form fields ──
     meta = {
         "drop_height":  request.form.get("dropHeight",   30,      type=int),
-        "surface":      request.form.get("surface",      "Glass"),
-        "denomination": request.form.get("denomination", "1"),     # "1"|"5"|"10"|"20"
+        "surface":      request.form.get("surface",      "Tile"),
+        "denomination": request.form.get("denomination", "1"), 
     }
 
-    # ── Save to temp file and analyze ──
     tmp_path = None
     try:
         with tempfile.NamedTemporaryFile(
@@ -63,15 +49,12 @@ def analyze():
         return jsonify(result)
 
     except ValueError as e:
-        # Bad audio data — client error
         return jsonify({"error": f"Invalid audio: {str(e)}"}), 422
 
     except Exception as e:
-        # Unexpected server error — don't crash, return clean message
         return jsonify({"error": f"Analysis failed: {str(e)}"}), 500
 
     finally:
-        # Always clean up temp file even if analysis throws
         if tmp_path and os.path.exists(tmp_path):
             os.unlink(tmp_path)
 

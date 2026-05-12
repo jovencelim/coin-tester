@@ -43,9 +43,9 @@ Ring segment         ← dynamic window (ends when signal hits noise floor)
 
 ## Supported Surfaces
 
-Tile (baseline), Concrete, Wood.
+Tile (baseline), Wood.
 
-The system applies surface correction factors to normalize measured f₀ and α to the Tile baseline before classification, so a single set of coin profiles works across all three surfaces.
+The system applies surface correction factors to normalize measured f₀ and α to the Tile baseline before classification, so a single set of coin profiles works across both surfaces.
 
 ---
 
@@ -124,9 +124,9 @@ Getting a clean recording directly affects classification accuracy.
 
 **What to avoid:**
 - Clipping (recording too loud — distorts the waveform)
-- Double impacts (coin bouncing and striking twice)
+- Catching the coin after it lands — let it settle naturally so the ring fully decays
 - Talking or handling noise during the ring
-- Recording on surfaces other than the three supported ones
+- Recording on surfaces other than the two supported ones (Tile, Wood)
 
 If the analysis returns a **Low SNR** warning, the recording was too quiet relative to background noise — move the mic closer or record in a quieter environment.
 
@@ -154,7 +154,7 @@ Accepts a multipart form with:
 |---|---|---|
 | `file` | `.wav` file | The coin drop recording |
 | `denomination` | string | `"1"`, `"5"`, `"10"`, or `"20"` |
-| `surface` | string | `"Tile"`, `"Concrete"`, or `"Wood"` |
+| `surface` | string | `"Tile"` or `"Wood"` |
 | `dropHeight` | integer | Drop height in cm (fixed at 30) |
 
 **Response:**
@@ -167,8 +167,9 @@ Accepts a multipart form with:
   "f0_norm":    3306.6,
   "alpha_norm": 13.484,
   "r_squared":  0.9712,
-  "snr_db":     28.3,
+  "snr_db":      28.3,
   "snr_warning": false,
+  "alpha_warning": false,
   "harmonics": [
     { "n": 2, "freq": 6487.2, "mag_db": -18.4, "ratio": 2.0013 },
     { "n": 3, "freq": 9721.5, "mag_db": -31.1, "ratio": 2.9994 }
@@ -205,7 +206,7 @@ Accepts a multipart form with:
 
 ### Onset Detection
 
-Computes short-time RMS energy in overlapping 512-sample windows (256-sample hop). The noise floor is estimated from the **quietest 20 consecutive frames** anywhere in the recording — not always the first 20 frames. This handles uploads that start mid-handling noise or with minimal pre-drop silence. Onset = first frame exceeding `noise_floor × 8`.
+Computes short-time RMS energy in overlapping 512-sample windows (256-sample hop). The noise floor is estimated from the **quietest 20 consecutive frames** anywhere in the recording. The onset anchors on the **loudest frame** (the actual coin impact) and walks backwards until the signal drops below `noise_floor × 8`. This is robust to pre-drop handling noise — which is quieter than the coin impact and would fool a forward threshold-crossing search.
 
 ### Dynamic Ring Window
 
@@ -226,7 +227,6 @@ Measured f₀ and α are divided by surface-specific scale factors before classi
 | Surface | α scale | f₀ scale |
 |---|---|---|
 | Tile | 1.00 | 1.00 |
-| Concrete | 1.10 | 0.98 |
 | Wood | 1.75 | 0.94 |
 
 This brings all measurements to a Tile-equivalent baseline so a single set of coin profiles applies across surfaces.
@@ -235,9 +235,13 @@ This brings all measurements to a Tile-equivalent baseline so a single set of co
 
 Scores the normalized features `[f₀, α, harmonic_ratio]` against genuine and counterfeit ranges using a soft distance function: score = 1.0 at the centroid of the range, 0.0 at the boundary, averaged across features × 100. Q-factor is **not** a classifier input — it is derived deterministically from f₀ and α, so including it would double-count information.
 
+**α is excluded from scoring when R² < 0.3.** On hard surfaces (Tile) coins often bounce multiple times, producing a non-exponential envelope and an unreliable α estimate. Excluding it when the fit is poor prevents a bad decay fit from overriding a valid f₀ and harmonic match.
+
+The genuine and counterfeit harmonic_ratio ranges are intentionally non-overlapping. Genuine steel coins produce 2nd harmonics close to 2× f₀ (range 1.70–2.30). The counterfeit range (1.20–1.70) targets coins with irregular casting that produce flatter, inharmonic spectra.
+
 Verdict logic:
-- `genuine_score > counterfeit_score` and `genuine_score ≥ 40` → **Genuine**
-- `genuine_score > counterfeit_score` and `genuine_score < 40` → **Suspect**
+- `genuine_score > counterfeit_score` and `genuine_score ≥ 15` → **Genuine**
+- `genuine_score > counterfeit_score` and `genuine_score < 15` → **Suspect**
 - `counterfeit_score ≥ genuine_score` → **Counterfeit**
 
 ---
@@ -253,7 +257,7 @@ The acoustic profiles in `DENOMINATION_PROFILES` (in `signal.py`) are starting e
 3. For each feature, compute `mean ± 1.5 × std` across the genuine drops → that is the new genuine range.
 4. Repeat for counterfeit drops.
 5. Update the ranges in `DENOMINATION_PROFILES`.
-6. Repeat for **Concrete** and **Wood** with genuine coins only, compute `mean_α_surface / mean_α_tile` and `mean_f0_surface / mean_f0_tile`, and update `SURFACE_CORRECTIONS`.
+6. Repeat for **Wood** with genuine coins only, compute `mean_α_surface / mean_α_tile` and `mean_f0_surface / mean_f0_tile`, and update `SURFACE_CORRECTIONS`.
 
 ---
 

@@ -1,87 +1,26 @@
-"""
-signal.py
----------
-DSP pipeline for the NGC Philippine peso coin authenticity tester.
-
-Experimental standards:
-  - Surface     : Tile (baseline), Concrete, Wood
-  - Drop height : 30 cm (fixed, guided)
-  - Recording   : 44,100 Hz, mono WAV (file upload)
-
-Pipeline:
-  1. detect_onset         — quietest-window noise floor, returns noise_floor_rms
-  2. extract_segment      — dynamic ring window (noise-adaptive, max 2.5 s)
-  3. compute_fft          — padded FFT, dB scale, f0 + harmonic extraction
-  4. compute_rms_envelope — frame RMS for decay fitting
-  5. fit_decay            — bounded curve_fit, R², 95% CI on alpha
-  6. compute_q            — display metric only (not used in classifier)
-  7. compute_snr          — warns when recording quality is too poor to trust
-  8. classify_coin        — surface-normalized f0 + alpha + harmonic_ratio
-  9. analyze_coin         — full pipeline, returns JSON-ready dict
-"""
-
 import numpy as np
 import librosa
 from scipy.signal import find_peaks
 from scipy.optimize import curve_fit
 
-
-# ─────────────────────────────────────────────
-# CONSTANTS
-# ─────────────────────────────────────────────
-
 SAMPLE_RATE       = 44100
-RING_DURATION_MIN = 0.20    # minimum ring window in seconds
-RING_DURATION_MAX = 2.50    # maximum ring window in seconds
-RING_END_THRESHOLD = 0.05   # end ring when envelope < this fraction of peak
+RING_DURATION_MIN = 0.20  
+RING_DURATION_MAX = 2.50   
+RING_END_THRESHOLD = 0.05
 MIN_FREQ_HZ       = 200
 MAX_FREQ_HZ       = 8000
 ONSET_WIN         = 512
 ONSET_HOP         = 256
 ONSET_MULT        = 8
 ENVELOPE_FRAME    = 256
-SNR_WARN_DB       = 15.0    # flag recording if SNR below this level (dB)
-
-
-# ─────────────────────────────────────────────
-# SURFACE CORRECTIONS
-# ─────────────────────────────────────────────
-# Scale factors normalize measured f0 and alpha to a Tile baseline
-# before comparing against DENOMINATION_PROFILES:
-#   f0_norm    = f0_measured    / f0_scale
-#   alpha_norm = alpha_measured / alpha_scale
-#
-# Why: the same genuine coin dropped on Wood decays faster (higher alpha)
-# and resonates at a slightly lower f0 than on Tile. Without correction,
-# every surface would need its own set of profile ranges.
-#
-# ⚠️  IMPORTANT: These are estimated starting values.
-#     Record 20+ genuine drops per surface, compute means, then update:
-#     alpha_scale = mean_alpha_surface / mean_alpha_tile  (same for f0).
+SNR_WARN_DB       = 15.0 
 
 SURFACE_CORRECTIONS = {
-    "Tile":     {"alpha_scale": 1.00, "f0_scale": 1.00},   # baseline
-    "Concrete": {"alpha_scale": 1.10, "f0_scale": 0.98},   # slightly faster decay
-    "Wood":     {"alpha_scale": 1.75, "f0_scale": 0.94},   # significantly faster decay
-    "Glass":    {"alpha_scale": 0.90, "f0_scale": 1.02},   # legacy surface
+    "Tile":     {"alpha_scale": 1.00, "f0_scale": 1.00},  
+    "Wood":     {"alpha_scale": 1.75, "f0_scale": 0.94},  
 }
 
-
-# ─────────────────────────────────────────────
-# 1. ONSET DETECTION
-# ─────────────────────────────────────────────
-
 def detect_onset(y: np.ndarray, sr: int = SAMPLE_RATE):
-    """
-    Adaptive RMS onset detector.
-
-    Returns (onset_sample, noise_floor_rms).
-
-    Uses the quietest 20 consecutive frames anywhere in the recording
-    as the noise floor — not always the first 20 frames. This handles
-    uploaded files that start mid-handling noise or with very little
-    pre-drop silence, which broke the original fixed-window approach.
-    """
     n_frames = (len(y) - ONSET_WIN) // ONSET_HOP
 
     rms = np.array([
@@ -99,16 +38,16 @@ def detect_onset(y: np.ndarray, sr: int = SAMPLE_RATE):
     else:
         noise_floor = float(np.median(rms))
 
-    cutoff = noise_floor * ONSET_MULT
-    above  = np.where(rms > cutoff)[0]
-    onset  = int(above[0] * ONSET_HOP) if len(above) > 0 else 0
+    cutoff     = noise_floor * ONSET_MULT
+    peak_frame = int(np.argmax(rms))
 
-    return onset, noise_floor
+    onset_frame = 0
+    for i in range(peak_frame, -1, -1):
+        if rms[i] < cutoff:
+            onset_frame = i + 1
+            break
 
-
-# ─────────────────────────────────────────────
-# 2. RING SEGMENT EXTRACTION  (dynamic window)
-# ─────────────────────────────────────────────
+    return int(onset_frame * ONSET_HOP), noise_floor
 
 def extract_segment(
     y: np.ndarray,
@@ -116,18 +55,7 @@ def extract_segment(
     onset: int,
     noise_floor_rms: float,
 ) -> np.ndarray:
-    """
-    Dynamic ring window with Hanning taper.
 
-    Extends until the RMS envelope drops to
-        max(RING_END_THRESHOLD × peak_rms, 2 × noise_floor_rms)
-    capped at RING_DURATION_MAX seconds.
-
-    On hard surfaces (tile, concrete) genuine coins ring for 1–2+ seconds.
-    The previous fixed 500 ms cut off most of the decay tail, producing
-    unreliable alpha estimates on those surfaces. On wood the threshold is
-    reached quickly so the window self-terminates early.
-    """
     max_samples = int(RING_DURATION_MAX * sr)
     min_samples = int(RING_DURATION_MIN * sr)
 
@@ -163,19 +91,7 @@ def extract_segment(
     segment = y[onset : end_sample]
     return segment * np.hanning(len(segment))
 
-
-# ─────────────────────────────────────────────
-# 3. FFT  (+ harmonic extraction)
-# ─────────────────────────────────────────────
-
 def compute_fft(segment: np.ndarray, sr: int = SAMPLE_RATE) -> dict:
-    """
-    Hanning-windowed FFT with f0 and harmonic extraction.
-
-    After finding f0, searches ±15 % bands around 2×f0 and 3×f0 for
-    secondary peaks. Harmonic ratios close to 2.0 / 3.0 indicate a
-    uniform alloy; significant deviations suggest irregular casting.
-    """
     N     = int(2 ** np.ceil(np.log2(len(segment))))
     fft   = np.fft.rfft(segment, n=N)
     freqs = np.fft.rfftfreq(N, d=1.0 / sr)
@@ -185,7 +101,6 @@ def compute_fft(segment: np.ndarray, sr: int = SAMPLE_RATE) -> dict:
     with np.errstate(divide="ignore"):
         mag_db = 20 * np.log10(np.maximum(mags, 1e-8))
 
-    # f0: most prominent peak in [MIN_FREQ_HZ, MAX_FREQ_HZ]
     mask      = (freqs >= MIN_FREQ_HZ) & (freqs <= MAX_FREQ_HZ)
     band_mags = mag_db.copy()
     band_mags[~mask] = -80
@@ -198,7 +113,6 @@ def compute_fft(segment: np.ndarray, sr: int = SAMPLE_RATE) -> dict:
 
     f0 = float(freqs[f0_bin])
 
-    # Harmonic extraction: 2nd and 3rd
     harmonics = []
     for n in (2, 3):
         target = f0 * n
@@ -229,11 +143,6 @@ def compute_fft(segment: np.ndarray, sr: int = SAMPLE_RATE) -> dict:
         "harmonics":     harmonics,
     }
 
-
-# ─────────────────────────────────────────────
-# 4. RMS ENVELOPE
-# ─────────────────────────────────────────────
-
 def compute_rms_envelope(segment: np.ndarray, sr: int = SAMPLE_RATE) -> dict:
     """Frame-by-frame RMS amplitude envelope."""
     n_frames = len(segment) // ENVELOPE_FRAME
@@ -257,13 +166,7 @@ def compute_rms_envelope(segment: np.ndarray, sr: int = SAMPLE_RATE) -> dict:
         "max_val":  max_val,
     }
 
-
-# ─────────────────────────────────────────────
-# 5. DECAY FIT
-# ─────────────────────────────────────────────
-
 def fit_decay(envelope: list, times: list) -> dict:
-    """Fit A·e^(−α·t) with bounds, R², and 95% CI on alpha."""
     env = np.array(envelope)
     t   = np.array(times)
 
@@ -317,41 +220,16 @@ def fit_decay(envelope: list, times: list) -> dict:
         "fit":       fit,
     }
 
-
-# ─────────────────────────────────────────────
-# 6. Q-FACTOR  (display metric only)
-# ─────────────────────────────────────────────
-
 def compute_q(f0: float, alpha: float) -> float:
-    """Q = π · f₀ / α. Not used in classification (derived from f0+alpha)."""
-    return float((np.pi * f0) / alpha) if alpha > 0 else 0.0
-
-
-# ─────────────────────────────────────────────
-# 7. SNR
-# ─────────────────────────────────────────────
+    if alpha < 0.1:
+        return 0.0
+    return round(float((np.pi * f0) / alpha), 2)
 
 def compute_snr(env_raw: np.ndarray, noise_floor_rms: float) -> float:
-    """20·log10(peak_envelope / noise_floor). Low SNR → unreliable verdict."""
     if noise_floor_rms <= 0 or len(env_raw) == 0:
         return 99.0
     peak = float(np.max(env_raw))
     return round(float(20.0 * np.log10(peak / noise_floor_rms)), 1) if peak > 0 else 0.0
-
-
-# ─────────────────────────────────────────────
-# 8. CLASSIFIER
-# ─────────────────────────────────────────────
-
-# Acoustic profiles are calibrated for Tile surface at 30 cm drop.
-# SURFACE_CORRECTIONS normalizes measurements to this baseline before scoring.
-#
-# Features used: f0, alpha, harmonic_ratio (2nd harmonic / f0).
-# Q is NOT a classifier feature — it is deterministically derived from f0
-# and alpha (Q = π·f0/α), so including it double-counts information.
-#
-# ⚠️  IMPORTANT: Record 20+ genuine + 10+ counterfeit drops per denomination
-#     on Tile at 30 cm, then update each range to mean ± 1.5 × std.
 
 DENOMINATION_PROFILES = {
     "1": {
@@ -359,14 +237,14 @@ DENOMINATION_PROFILES = {
         "material":    "Nickel-plated steel",
         "diameter_mm": 23.0,
         "genuine": {
-            "f0":             (2800, 3800),
-            "alpha":          (8,    22),
-            "harmonic_ratio": (1.92, 2.08),
+            "f0":             (1500, 5500),
+            "alpha":          (0.5,  35),
+            "harmonic_ratio": (1.70, 2.30),
         },
         "counterfeit": {
-            "f0":             (1000, 2900),
+            "f0":             (200,  1600),
             "alpha":          (25,   120),
-            "harmonic_ratio": (1.65, 2.35),
+            "harmonic_ratio": (1.20, 1.70),
         },
     },
     "5": {
@@ -374,14 +252,14 @@ DENOMINATION_PROFILES = {
         "material":    "Nickel-plated steel",
         "diameter_mm": 27.0,
         "genuine": {
-            "f0":             (2000, 3000),
-            "alpha":          (6,    18),
-            "harmonic_ratio": (1.92, 2.08),
+            "f0":             (1000, 5000),
+            "alpha":          (0.5,  30),
+            "harmonic_ratio": (1.70, 2.30),
         },
         "counterfeit": {
-            "f0":             (800,  2100),
+            "f0":             (200,  1200),
             "alpha":          (20,   100),
-            "harmonic_ratio": (1.65, 2.35),
+            "harmonic_ratio": (1.20, 1.70),
         },
     },
     "10": {
@@ -389,14 +267,14 @@ DENOMINATION_PROFILES = {
         "material":    "Nickel-plated steel",
         "diameter_mm": 25.5,
         "genuine": {
-            "f0":             (2300, 3300),
-            "alpha":          (7,    20),
-            "harmonic_ratio": (1.92, 2.08),
+            "f0":             (1200, 5000),
+            "alpha":          (0.5,  30),
+            "harmonic_ratio": (1.70, 2.30),
         },
         "counterfeit": {
-            "f0":             (900,  2400),
+            "f0":             (200,  1300),
             "alpha":          (22,   110),
-            "harmonic_ratio": (1.65, 2.35),
+            "harmonic_ratio": (1.20, 1.70),
         },
     },
     "20": {
@@ -404,14 +282,14 @@ DENOMINATION_PROFILES = {
         "material":    "Bimetallic (steel center + brass ring)",
         "diameter_mm": 28.0,
         "genuine": {
-            "f0":             (1400, 2400),
-            "alpha":          (12,   32),
-            "harmonic_ratio": (1.88, 2.12),
+            "f0":             (800,  4500),
+            "alpha":          (0.5,  40),
+            "harmonic_ratio": (1.65, 2.35),
         },
         "counterfeit": {
-            "f0":             (600,  1600),
+            "f0":             (200,  1000),
             "alpha":          (30,   130),
-            "harmonic_ratio": (1.60, 2.40),
+            "harmonic_ratio": (1.15, 1.65),
         },
     },
 }
@@ -424,13 +302,8 @@ def classify_coin(
     denomination: str = "1",
     surface: str = "Tile",
     harmonics: list = None,
+    r_squared: float = 1.0,
 ) -> dict:
-    """
-    Denomination- and surface-aware authenticator.
-
-    Normalizes measured f0 and alpha to the Tile baseline via
-    SURFACE_CORRECTIONS before scoring against DENOMINATION_PROFILES.
-    """
     profile = DENOMINATION_PROFILES.get(str(denomination))
     if profile is None:
         return {
@@ -450,8 +323,12 @@ def classify_coin(
                 harmonic_ratio = h["ratio"]
                 break
 
+    use_alpha = r_squared >= 0.3
+
     def score_class(cls_ranges: dict) -> float:
-        features = {"f0": f0_norm, "alpha": alpha_norm}
+        features = {"f0": f0_norm}
+        if use_alpha:
+            features["alpha"] = alpha_norm
         if harmonic_ratio is not None:
             features["harmonic_ratio"] = harmonic_ratio
         total = 0.0
@@ -469,7 +346,7 @@ def classify_coin(
     genuine_score     = score_class(profile["genuine"])
     counterfeit_score = score_class(profile["counterfeit"])
 
-    if genuine_score > counterfeit_score and genuine_score >= 40:
+    if genuine_score > counterfeit_score and genuine_score >= 15:
         verdict    = "Genuine"
         confidence = genuine_score
     elif genuine_score > counterfeit_score:
@@ -493,16 +370,7 @@ def classify_coin(
         },
     }
 
-
-# ─────────────────────────────────────────────
-# 9. FULL PIPELINE
-# ─────────────────────────────────────────────
-
 def analyze_coin(file_path: str, meta: dict = None) -> dict:
-    """
-    Load a WAV file and run the complete analysis pipeline.
-    Returns a single JSON-serializable dict for the Flask endpoint.
-    """
     if meta is None:
         meta = {}
 
@@ -524,32 +392,27 @@ def analyze_coin(file_path: str, meta: dict = None) -> dict:
 
     Q      = compute_q(f0, alpha)
     snr_db = compute_snr(np.array(env_data["raw"]), noise_floor)
-    clf    = classify_coin(f0, alpha, Q, denomination, surface, harmonics)
+    clf    = classify_coin(f0, alpha, Q, denomination, surface, harmonics, decay["r_squared"])
 
     return {
-        # ── Scalar features ──
         "f0":         f0,
         "alpha":      round(alpha, 4),
         "Q":          round(Q, 2),
         "onset":      onset,
         "onset_time": round(onset / sr, 4),
 
-        # ── Fit quality ──
         "r_squared": decay["r_squared"],
         "alpha_ci":  decay["alpha_ci"],
 
-        # ── Recording quality ──
-        "snr_db":      snr_db,
-        "snr_warning": snr_db < SNR_WARN_DB,
+        "snr_db":       snr_db,
+        "snr_warning":  snr_db < SNR_WARN_DB,
+        "alpha_warning": alpha < 1.0,
 
-        # ── Surface-normalized features (used by classifier) ──
         "f0_norm":    clf.get("f0_norm"),
         "alpha_norm": clf.get("alpha_norm"),
 
-        # ── Harmonics ──
         "harmonics": harmonics,
 
-        # ── Chart data for React ──
         "waveform": {
             "samples":     y.tolist(),
             "sample_rate": sr,
@@ -570,13 +433,11 @@ def analyze_coin(file_path: str, meta: dict = None) -> dict:
             "A":        decay["A"],
         },
 
-        # ── Classification ──
         "verdict":      clf["verdict"],
         "confidence":   clf["confidence"],
         "denomination": clf["denomination"],
         "coin_label":   clf["coin_label"],
         "scores":       clf["scores"],
 
-        # ── Experiment metadata ──
         "meta": meta,
     }

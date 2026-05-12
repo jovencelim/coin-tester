@@ -1,17 +1,6 @@
 import { useState, useRef, useCallback } from "react";
 
-/**
- * Uploader
- * --------
- * Accepts a .wav file via drag-and-drop or file picker.
- * Decodes it with the Web Audio API and passes:
- *   - audioUrl    → object URL for Waveform display
- *   - audioBuffer → decoded AudioBuffer for signal analysis
- *   - meta        → { dropHeight, surface, denomination }
- * up to the parent via props.
- */
-
-const SURFACES      = ["Tile", "Concrete", "Wood"];
+const SURFACES      = ["Tile", "Wood"];
 const DENOMINATIONS = [
   { value: "1",  label: "₱1  — Nickel-plated steel, 23mm" },
   { value: "5",  label: "₱5  — Nickel-plated steel, 27mm" },
@@ -23,7 +12,7 @@ export default function Uploader({ onUpload, loading = false }) {
   const [dragging,     setDragging]     = useState(false);
   const [fileMeta,     setFileMeta]     = useState(null);
   const [error,        setError]        = useState(null);
-  const [surface,      setSurface]      = useState("Glass");
+  const [surface,      setSurface]      = useState("Tile");
   const [denomination, setDenomination] = useState("1");
   const inputRef = useRef(null);
 
@@ -40,7 +29,6 @@ export default function Uploader({ onUpload, loading = false }) {
       size:    (file.size / 1024).toFixed(1) + " KB",
     });
 
-    // Send file + metadata to App → Flask
     onUpload?.(file, {
       dropHeight:   30,
       surface,
@@ -49,7 +37,6 @@ export default function Uploader({ onUpload, loading = false }) {
 
   }, [onUpload, surface, denomination]);
 
-  // ── Drag handlers ──
   const handleDragOver  = (e) => { e.preventDefault(); setDragging(true); };
   const handleDragLeave = ()  => setDragging(false);
   const handleDrop      = (e) => {
@@ -59,17 +46,14 @@ export default function Uploader({ onUpload, loading = false }) {
     if (file) processFile(file);
   };
 
-  // ── File picker ──
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];
     if (file) processFile(file);
-    e.target.value = ""; // allow re-selecting the same file
+    e.target.value = ""; 
   };
 
   return (
     <div className="flex flex-col gap-4">
-
-      {/* ── Denomination selector ── */}
       <div className="flex flex-col gap-1.5">
         <label className="font-mono text-[11px] text-[#7A7870] tracking-widest">
           DENOMINATION
@@ -94,8 +78,6 @@ export default function Uploader({ onUpload, loading = false }) {
           {DENOMINATIONS.find(d => d.value === denomination)?.label}
         </p>
       </div>
-
-      {/* ── Experiment metadata ── */}
       <div className="grid grid-cols-2 gap-2">
         <div className="flex flex-col gap-1.5">
           <label className="font-mono text-[11px] text-[#7A7870] tracking-widest">
@@ -109,7 +91,6 @@ export default function Uploader({ onUpload, loading = false }) {
             <span className="font-mono text-[11px] text-[#7A7870]">cm · fixed</span>
           </div>
         </div>
-
         <div className="flex flex-col gap-1.5">
           <label className="font-mono text-[11px] text-[#7A7870] tracking-widest">
             SURFACE
@@ -127,8 +108,6 @@ export default function Uploader({ onUpload, loading = false }) {
           </select>
         </div>
       </div>
-
-      {/* ── Drop zone ── */}
       <div
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
@@ -151,11 +130,9 @@ export default function Uploader({ onUpload, loading = false }) {
           className="hidden"
           onChange={handleFileChange}
         />
-
         <div className={`text-3xl transition-transform duration-200 ${dragging ? "scale-110" : ""}`}>
           {loading ? "⏳" : "🪙"}
         </div>
-
         <div className="text-center">
           <p className="text-sm text-[#A8A49C]">
             {loading
@@ -170,16 +147,12 @@ export default function Uploader({ onUpload, loading = false }) {
           )}
         </div>
       </div>
-
-      {/* ── Error ── */}
       {error && (
         <div className="flex items-start gap-2 rounded-lg bg-red-950/40 border border-red-800/40 px-3 py-2.5">
           <span className="text-red-400 text-sm">⚠</span>
           <p className="text-xs text-red-400 leading-relaxed">{error}</p>
         </div>
       )}
-
-      {/* ── File metadata ── */}
       {fileMeta && !error && (
         <div className="flex flex-col gap-1.5">
           {[
@@ -202,8 +175,6 @@ export default function Uploader({ onUpload, loading = false }) {
           ))}
         </div>
       )}
-
-      {/* ── Upload another file ── */}
       {fileMeta && (
         <button
           onClick={() => inputRef.current?.click()}
@@ -214,7 +185,6 @@ export default function Uploader({ onUpload, loading = false }) {
           ↺ UPLOAD ANOTHER FILE
         </button>
       )}
-
     </div>
   );
 }

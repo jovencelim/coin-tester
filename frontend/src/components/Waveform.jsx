@@ -13,11 +13,9 @@ export default function Waveform({ waveform, onset }) {
     const width = canvas.width;
     const height = canvas.height;
 
-    // background
     ctx.fillStyle = "#0F172A";
     ctx.fillRect(0, 0, width, height);
 
-    // waveform
     ctx.strokeStyle = "#38BDF8";
     ctx.lineWidth = 1.5;
 
@@ -39,7 +37,6 @@ export default function Waveform({ waveform, onset }) {
 
     ctx.stroke();
 
-    // onset marker
     if (onset !== undefined) {
       const onsetX = (onset / waveform.length) * width;
 
@@ -51,7 +48,6 @@ export default function Waveform({ waveform, onset }) {
       ctx.lineTo(onsetX, height);
       ctx.stroke();
 
-      // label
       ctx.fillStyle = "#D4AF37";
       ctx.font = "11px monospace";
       ctx.fillText("ONSET", onsetX + 6, 14);
