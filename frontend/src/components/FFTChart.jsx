@@ -30,7 +30,7 @@ export default function FFTChart({ fft }) {
     );
   }
 
-  const { freqs, magnitudes_db, f0 } = fft;
+  const { freqs, magnitudes_db, f0, harmonics = [] } = fft;
 
   // Downsample to max 300 points and cap at 8 kHz for performance
   const chartData = useMemo(() => {
@@ -64,14 +64,24 @@ export default function FFTChart({ fft }) {
   return (
     <div className="flex flex-col gap-3">
 
-      {/* f₀ readout */}
-      <div className="flex items-center justify-between">
+      {/* f₀ and harmonics readout */}
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <span className="font-mono text-[11px] text-[#7A7870] tracking-widest">
           DOMINANT FREQ
         </span>
-        <span className="font-mono text-sm font-semibold text-[#D4AF37]">
-          f₀ = {f0.toFixed(1)} Hz
-        </span>
+        <div className="flex items-center gap-3">
+          <span className="font-mono text-sm font-semibold text-[#D4AF37]">
+            f₀ = {f0.toFixed(1)} Hz
+          </span>
+          {harmonics.map((h) => (
+            <span key={h.n} className="font-mono text-[11px] text-[#7A7870]">
+              {h.n}f₀ = {h.freq.toFixed(0)} Hz
+              <span className={`ml-1 ${Math.abs(h.ratio - h.n) < 0.08 ? "text-green-400" : "text-yellow-400"}`}>
+                ({h.ratio.toFixed(3)}×)
+              </span>
+            </span>
+          ))}
+        </div>
       </div>
 
       {/* Spectrum chart */}
@@ -111,6 +121,21 @@ export default function FFTChart({ fft }) {
                 fill: "#F0CE5E", fontSize: 10, fontFamily: "monospace",
               }}
             />
+
+            {/* Harmonic markers */}
+            {harmonics.map((h) => (
+              <ReferenceLine
+                key={h.n}
+                x={parseFloat(h.freq.toFixed(1))}
+                stroke="#6B7280"
+                strokeWidth={1}
+                strokeDasharray="3 4"
+                label={{
+                  value: `${h.n}f₀`, position: "top",
+                  fill: "#6B7280", fontSize: 9, fontFamily: "monospace",
+                }}
+              />
+            ))}
 
             <Area
               type="monotone"
