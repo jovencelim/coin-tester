@@ -8,7 +8,7 @@ const DENOMINATIONS = [
   { value: "20", label: "₱20 — Bimetallic, 28mm" },
 ];
 
-export default function Uploader({ onUpload, loading = false }) {
+export default function Uploader({ onUpload, onReset, loading = false }) {
   const [dragging,     setDragging]     = useState(false);
   const [fileMeta,     setFileMeta]     = useState(null);
   const [error,        setError]        = useState(null);
@@ -177,12 +177,12 @@ export default function Uploader({ onUpload, loading = false }) {
       )}
       {fileMeta && (
         <button
-          onClick={() => inputRef.current?.click()}
+          onClick={() => { setFileMeta(null); setError(null); onReset?.(); }}
           className="w-full py-2.5 rounded-lg font-mono text-xs tracking-widest text-[#7A7870]
                      border border-white/[0.07] bg-transparent hover:border-[rgba(212,175,55,0.3)]
                      hover:text-[#E8E6E0] transition-all duration-150"
         >
-          ↺ UPLOAD ANOTHER FILE
+          ↺ RESET
         </button>
       )}
     </div>

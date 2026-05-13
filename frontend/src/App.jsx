@@ -109,7 +109,7 @@ export default function App() {
       >
         <div style={{ gridColumn: 1, gridRow: "1 / 3" }}>
           <Panel title="Input" index="01">
-            <Uploader onUpload={handleUpload} loading={loading} />
+            <Uploader onUpload={handleUpload} onReset={() => { setResult(null); setError(null); }} loading={loading} />
           </Panel>
         </div>
         <div style={{ gridColumn: "2 / 4", gridRow: 1 }}>

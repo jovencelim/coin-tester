@@ -237,7 +237,7 @@ DENOMINATION_PROFILES = {
         "material":    "Nickel-plated steel",
         "diameter_mm": 23.0,
         "genuine": {
-            "f0":             (1500, 5500),
+            "f0":             (1200, 6500),
             "alpha":          (0.5,  35),
             "harmonic_ratio": (1.70, 2.30),
         },
@@ -282,7 +282,7 @@ DENOMINATION_PROFILES = {
         "material":    "Bimetallic (steel center + brass ring)",
         "diameter_mm": 28.0,
         "genuine": {
-            "f0":             (800,  4500),
+            "f0":             (700,  7500),
             "alpha":          (0.5,  40),
             "harmonic_ratio": (1.65, 2.35),
         },
@@ -352,6 +352,9 @@ def classify_coin(
     elif genuine_score > counterfeit_score:
         verdict    = "Suspect"
         confidence = genuine_score
+    elif genuine_score == 0 and counterfeit_score == 0:
+        verdict    = "Suspect"
+        confidence = 0.0
     else:
         verdict    = "Counterfeit"
         confidence = counterfeit_score
